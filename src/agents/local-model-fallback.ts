@@ -53,6 +53,8 @@ export type HealthStatus = {
 };
 
 const healthStatusMap = new Map<string, HealthStatus>();
+// Tracks consecutive cloud-chain failures per provider:model key across invocations.
+const cloudFailureCountMap = new Map<string, number>();
 const DEFAULT_LMSTUDIO_BASE_URL = "http://127.0.0.1:1234";
 const DEFAULT_LOCAL_MODEL = "llama3.2";
 const DEFAULT_TIMEOUT_MS = 60000;
@@ -226,6 +228,8 @@ export async function runWithLocalModelFallback<T>(params: {
   let cloudResult: ModelFallbackRunResult<T> | null = null;
   let cloudError: unknown = null;
 
+  const cloudKey = `${params.provider}:${params.model}`;
+
   try {
     cloudResult = await runWithModelFallback({
       cfg: params.cfg,
@@ -240,11 +244,21 @@ export async function runWithLocalModelFallback<T>(params: {
   }
 
   if (cloudResult) {
+    // Reset failure counter on success.
+    cloudFailureCountMap.delete(cloudKey);
     return cloudResult;
   }
 
-  // Cloud failed — check whether this error qualifies for local fallback.
-  if (!shouldTriggerLocalFallback(cloudError, fallbackOptions, 1)) {
+  // Track consecutive failures and check whether this error qualifies for local fallback.
+  // Evict the oldest entry if the map grows beyond a small bound (guard against unbounded growth
+  // in pathological configs with many distinct provider:model keys).
+  const consecutiveFailures = (cloudFailureCountMap.get(cloudKey) ?? 0) + 1;
+  if (!cloudFailureCountMap.has(cloudKey) && cloudFailureCountMap.size >= 100) {
+    cloudFailureCountMap.delete(cloudFailureCountMap.keys().next().value!);
+  }
+  cloudFailureCountMap.set(cloudKey, consecutiveFailures);
+
+  if (!shouldTriggerLocalFallback(cloudError, fallbackOptions, consecutiveFailures)) {
     throw cloudError;
   }
 

@@ -121,9 +121,9 @@ export type CliBackendConfig = {
 
 export type AgentDefaultsConfig = {
   /** Local model fallback configuration for graceful degradation when cloud APIs fail */
-  localModelFallback?: LocalModelConfig;
+  localModelFallback?: Partial<LocalModelConfig>;
   /** Semantic cache configuration for query/response caching based on embedding similarity */
-  semanticCache?: SemanticCacheConfig;
+  semanticCache?: Partial<SemanticCacheConfig>;
   /** Primary model and fallbacks (provider/model). Accepts string or {primary,fallbacks}. */
   model?: AgentModelConfig;
   /** Optional image-capable model and fallbacks (provider/model). Accepts string or {primary,fallbacks}. */

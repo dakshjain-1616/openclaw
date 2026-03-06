@@ -251,8 +251,15 @@ export class SemanticCacheStore {
       },
     };
 
-    // eslint-disable-next-line default-case
     switch (this.config.embeddingProvider) {
+      case "openai":
+      case "auto":
+        // "openai" and "auto" are accepted by the schema but not yet implemented;
+        // fall back to Ollama and warn so misconfiguration is visible.
+        log.warn(
+          `Embedding provider "${this.config.embeddingProvider}" is not yet implemented; falling back to Ollama.`,
+        );
+      // falls through
       case "ollama":
       case "local":
       default: {
@@ -385,7 +392,12 @@ export class SemanticCacheStore {
     if (!this.embeddingProvider) {
       await this.initialize();
     }
-    return this.embeddingProvider!.embedQuery(text);
+    if (!this.embeddingProvider) {
+      throw new Error(
+        `Embedding provider failed to initialise (configured: "${this.config.embeddingProvider}"). Check that the provider is reachable.`,
+      );
+    }
+    return this.embeddingProvider.embedQuery(text);
   }
 
   /**

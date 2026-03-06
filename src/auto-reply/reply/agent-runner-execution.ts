@@ -141,6 +141,12 @@ export async function runAgentTurnWithFallback(params: {
     params.getActiveSessionEntry()?.systemPromptReport,
   );
 
+  // Initialize semantic cache once outside the retry loop to avoid repeated SQLite loads.
+  const cacheConfig = resolveSemanticCacheConfig(params.followupRun.run.config);
+  const semanticCache = cacheConfig
+    ? new SemanticCacheStore(cacheConfig, params.followupRun.run.agentId)
+    : null;
+
   while (true) {
     try {
       const normalizeStreamingText = (payload: ReplyPayload): { text?: string; skip: boolean } => {
@@ -195,12 +201,6 @@ export async function runAgentTurnWithFallback(params: {
       };
       const blockReplyPipeline = params.blockReplyPipeline;
       const onToolResult = params.opts?.onToolResult;
-      // Initialize semantic cache if configured
-      const cacheConfig = resolveSemanticCacheConfig(params.followupRun.run.config);
-      const semanticCache = cacheConfig
-        ? new SemanticCacheStore(cacheConfig, params.followupRun.run.agentId)
-        : null;
-
       // Check semantic cache before running LLM
       if (semanticCache && params.commandBody) {
         await semanticCache.initialize();
